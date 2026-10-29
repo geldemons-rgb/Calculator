@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Калькулятор радиолинии</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#1b2127;--muted:#667085;--line:#dde2e8;--accent:#1f6feb;--ok:#1a8a4a;--warn:#b7791f;--bad:#d1383d;color-scheme:light;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161b;--card:#1b2027;--text:#e6e9ed;--muted:#97a0ac;--line:#2f353e;--accent:#6aa5ff;--ok:#4cc380;--warn:#e0a84a;--bad:#ff6b6f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161b;--card:#1b2027;--text:#e6e9ed;--muted:#97a0ac;--line:#2f353e;--accent:#6aa5ff;--ok:#4cc380;--warn:#e0a84a;--bad:#ff6b6f;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+main{max-width:960px;margin:0 auto;padding:20px 16px 32px}
+h1{font-size:1.5rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px}
+.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+button{background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;cursor:pointer;font:inherit;font-size:.85rem}
+button:hover{border-color:var(--accent)}
+.f{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.f label{font-size:.92rem}
+.f input{width:96px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;text-align:right}
+.status{border-radius:10px;padding:12px;font-weight:700;font-size:1.1rem;margin-bottom:12px;border:1px solid var(--line)}
+.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.kv div{background:var(--bg);border-radius:10px;padding:8px 10px}
+.kv small{display:block;color:var(--muted)}
+.kv strong{font-size:1.1rem}
+svg{width:100%;height:auto;display:block}
+</style>
+</head>
+<body>
+<main>
+<h1>Калькулятор радиолинии</h1>
+<p class="sub">Потери в свободном пространстве, уровень сигнала на входе приёмника и запас по связи.</p>
+<div class="grid">
+<section class="card">
+<div class="presets" id="presets"></div>
+<div id="inputs"></div>
+<button id="theme">Сменить тему</button>
+</section>
+<section class="card">
+<div class="status" id="status"></div>
+<div class="kv">
+<div><small>Потери FSPL</small><strong id="fspl"></strong></div>
+<div><small>Уровень на входе</small><strong id="rx"></strong></div>
+<div><small>Запас по связи</small><strong id="mar"></strong></div>
+<div><small>Макс. дальность</small><strong id="rng"></strong></div>
+</div>
+<svg id="chart" viewBox="0 0 420 250" role="img" aria-label="График уровня сигнала от расстояния"></svg>
+</section>
+</div>
+</main>
+<script>
+var fields=[["f","Частота, МГц",2400],["d","Расстояние, км",0.1],["pt","Мощность передатчика, дБм",20],["gt","Усиление антенны Tx, дБи",2],["gr","Усиление антенны Rx, дБи",2],["l","Прочие потери, дБ",0],["s","Чувствительность Rx, дБм",-85]];
+var presets=[["Wi-Fi 2,4 ГГц",[2400,0.1,20,2,2,0,-85]],["LTE 800 МГц",[800,5,43,15,0,3,-100]],["5G 3,5 ГГц",[3500,1,46,18,0,3,-95]],["Радиорелейка 7 ГГц",[7000,30,30,38,38,3,-80]]];
+var box=document.getElementById("inputs"),pb=document.getElementById("presets");
+fields.forEach(function(x){var d=document.createElement("div");d.className="f";d.innerHTML='<label for="'+x[0]+'">'+x[1]+'</label><input type="number" step="any" id="'+x[0]+'" value="'+x[2]+'">';box.appendChild(d);d.querySelector("input").addEventListener("input",calc)});
+presets.forEach(function(p){var b=document.createElement("button");b.textContent=p[0];b.onclick=function(){fields.forEach(function(x,i){document.getElementById(x[0]).value=p[1][i]});calc()};pb.appendChild(b)});
+function v(id){var n=parseFloat(document.getElementById(id).value);return isNaN(n)?0:n}
+function fspl(f,d){return 32.44+20*Math.log10(f)+20*Math.log10(d)}
+function calc(){
+var f=Math.max(v("f"),1),d=Math.max(v("d"),0.001),pt=v("pt"),gt=v("gt"),gr=v("gr"),l=v("l"),s=v("s");
+var eirp=pt+gt-l;
+var loss=fspl(f,d),rx=eirp+gr-loss,mar=rx-s;
+var rng=Math.pow(10,(eirp+gr-s-32.44-20*Math.log10(f))/20);
+document.getElementById("fspl").textContent=loss.toFixed(1)+" дБ";
+document.getElementById("rx").textContent=rx.toFixed(1)+" дБм";
+document.getElementById("mar").textContent=mar.toFixed(1)+" дБ";
+document.getElementById("rng").textContent=(rng>=1?rng.toFixed(1)+" км":(rng*1000).toFixed(0)+" м");
+var st=document.getElementById("status"),c,t;
+if(mar>=10){c="var(--ok)";t="Связь устойчивая: запас достаточный"}else if(mar>=0){c="var(--warn)";t="Связь на грани: запас мал"}else{c="var(--bad)";t="Связи нет: сигнал ниже чувствительности"}
+st.style.color=c;st.style.borderColor=c;st.textContent=t;
+var W=420,H=250,L=48,B=30,T=12,R=12,xmax=Math.max(d,rng)*1.3;
+var ymin=s-20,ymax=Math.max(s+40,Math.min(rx+10,s+80));
+function X(x){return L+(W-L-R)*x/xmax}
+function Y(y){y=Math.max(ymin,Math.min(ymax,y));return T+(H-T-B)*(ymax-y)/(ymax-ymin)}
+var g="",i,pts=[];
+for(i=0;i<=4;i++){var yv=ymin+(ymax-ymin)*i/4;g+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(yv)+'" y2="'+Y(yv)+'" stroke="var(--line)"/><text x="'+(L-6)+'" y="'+(Y(yv)+4)+'" text-anchor="end" font-size="10" fill="var(--muted)">'+yv.toFixed(0)+'</text>'}
+for(i=0;i<=4;i++){var xv=xmax*i/4;g+='<text x="'+X(xv)+'" y="'+(H-10)+'" text-anchor="middle" font-size="10" fill="var(--muted)">'+(xv<10?xv.toFixed(1):xv.toFixed(0))+'</text>'}
+for(i=1;i<=80;i++){var xd=xmax*i/80;pts.push(X(xd)+","+Y(eirp+gr-fspl(f,xd)))}
+g+='<polyline points="'+pts.join(" ")+'" fill="none" stroke="var(--accent)" stroke-width="2.5"/>';
+g+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(s)+'" y2="'+Y(s)+'" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="'+(W-R-2)+'" y="'+(Y(s)-4)+'" text-anchor="end" font-size="10" fill="var(--bad)">чувствительность</text>';
+g+='<circle cx="'+X(d)+'" cy="'+Y(rx)+'" r="5" fill="'+c+'"/>';
+g+='<text x="'+((L+W)/2)+'" y="'+(H-0)+'" text-anchor="middle" font-size="10" fill="var(--muted)">расстояние, км · по вертикали дБм</text>';
+document.getElementById("chart").innerHTML=g;
+}
+document.getElementById("theme").onclick=function(){var r=document.documentElement,dark=r.getAttribute("data-theme")==="dark"||(!r.getAttribute("data-theme")&&matchMedia("(prefers-color-scheme:dark)").matches);r.setAttribute("data-theme",dark?"light":"dark")};
+calc();
+</script>
+</body>
+</html>
